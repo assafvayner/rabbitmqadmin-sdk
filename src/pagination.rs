@@ -14,7 +14,7 @@ use serde::Deserialize;
 /// `pagination=true` parameter is always added so the server responds with a
 /// [`Paginated`] envelope.
 ///
-/// Serialization to the query string is hand-rolled in [`Self::to_pairs`]
+/// Serialization to the query string is hand-rolled in `to_pairs`
 /// (the single source of truth), so no `Serialize` derive is needed.
 #[derive(Debug, Default, Clone)]
 pub struct PaginationQuery {

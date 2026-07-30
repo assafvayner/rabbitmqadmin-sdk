@@ -39,7 +39,7 @@ pub enum Error {
     InvalidUrl(String),
 }
 
-/// Result alias using this crate's [`Error`] type.
+/// Result alias using this crate's [`Error`](enum@Error) type.
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
