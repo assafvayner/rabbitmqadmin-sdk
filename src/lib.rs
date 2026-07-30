@@ -47,6 +47,11 @@ pub struct Client {
     /// Base URL of the API, always ending in `/api/`
     /// (e.g. `http://localhost:15672/api/`).
     base_url: reqwest::Url,
+    /// Basic-auth header value applied per-request. Always `Some` — the
+    /// default reqwest client also carries it as a default header, but when
+    /// the caller supplies their own client we must inject it on every
+    /// request since a built `reqwest::Client`'s headers can't be modified.
+    auth: Option<HeaderValue>,
 }
 
 /// Builder for [`Client`]. See [`Client::builder`].
@@ -96,10 +101,13 @@ impl Client {
         query: Option<&PaginationQuery>,
     ) -> Result<T> {
         let url = self.url(path)?;
-        let req = self
+        let mut req = self
             .http
             .get(url)
             .query(&query.map(|q| q.to_pairs()).unwrap_or_default());
+        if let Some(auth) = &self.auth {
+            req = req.header(AUTHORIZATION, auth.clone());
+        }
         let resp = req.send().await?;
         let body = handle_response(resp).await?;
         serde_json::from_str(&body).map_err(|e| Error::Deserialize { source: e, body })
@@ -119,14 +127,22 @@ impl Client {
 
     /// Low-level `PUT` with a JSON body; the response body is ignored.
     pub(crate) async fn put<B: Serialize>(&self, path: &str, body: &B) -> Result<()> {
-        let resp = self.http.put(self.url(path)?).json(body).send().await?;
+        let resp = self
+            .request_with_auth(self.http.put(self.url(path)?))
+            .json(body)
+            .send()
+            .await?;
         handle_response(resp).await?;
         Ok(())
     }
 
     /// Low-level `POST` with a JSON body; the response body is ignored.
     pub(crate) async fn post<B: Serialize>(&self, path: &str, body: &B) -> Result<()> {
-        let resp = self.http.post(self.url(path)?).json(body).send().await?;
+        let resp = self
+            .request_with_auth(self.http.post(self.url(path)?))
+            .json(body)
+            .send()
+            .await?;
         handle_response(resp).await?;
         Ok(())
     }
@@ -138,7 +154,11 @@ impl Client {
         B: Serialize,
         T: DeserializeOwned,
     {
-        let resp = self.http.post(self.url(path)?).json(body).send().await?;
+        let resp = self
+            .request_with_auth(self.http.post(self.url(path)?))
+            .json(body)
+            .send()
+            .await?;
         let body = handle_response(resp).await?;
         serde_json::from_str(&body).map_err(|e| Error::Deserialize { source: e, body })
     }
@@ -155,7 +175,7 @@ impl Client {
         path: &str,
         headers: &[(&str, &str)],
     ) -> Result<()> {
-        let mut req = self.http.delete(self.url(path)?);
+        let mut req = self.request_with_auth(self.http.delete(self.url(path)?));
         for (k, v) in headers {
             req = req.header(*k, *v);
         }
@@ -185,12 +205,26 @@ impl Client {
             .join(path)
             .map_err(|e| Error::InvalidUrl(format!("{path}: {e}")))
     }
+
+    /// Attach the Basic-auth header to a request builder when it isn't
+    /// already guaranteed by the underlying client's default headers.
+    /// With the default client this is a harmless duplicate; with a
+    /// caller-supplied client it is what actually authenticates the request.
+    fn request_with_auth(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match &self.auth {
+            Some(auth) => req.header(AUTHORIZATION, auth.clone()),
+            None => req,
+        }
+    }
 }
 
 impl ClientBuilder {
     /// Use a pre-configured [`reqwest::Client`] (e.g. with custom TLS,
     /// timeouts, or proxies) instead of the default one. The Authorization
-    /// and Content-Type default headers are still applied on top of it.
+    /// and Content-Type default headers are still applied on top of it:
+    /// Content-Type via `.json(...)` bodies, and Authorization is injected
+    /// on every request (a built `reqwest::Client`'s default headers cannot
+    /// be modified, so the SDK applies it per-request instead).
     pub fn http_client(mut self, http: reqwest::Client) -> Self {
         self.http = Some(http);
         self
@@ -232,6 +266,10 @@ impl ClientBuilder {
             HeaderValue::from_str(&format!("Basic {}", base64_encode(auth.as_bytes())))
                 .map_err(|e| Error::InvalidUrl(format!("invalid credentials: {e}")))?;
         auth_value.set_sensitive(true);
+        // Keep a clone for per-request injection (needed when the caller
+        // supplies their own `reqwest::Client`, whose default headers cannot
+        // be modified after construction).
+        let auth_value_for_requests = auth_value.clone();
         headers.insert(AUTHORIZATION, auth_value);
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
@@ -242,7 +280,11 @@ impl ClientBuilder {
                 .build()?,
         };
 
-        Ok(Client { http, base_url })
+        Ok(Client {
+            http,
+            base_url,
+            auth: Some(auth_value_for_requests),
+        })
     }
 }
 

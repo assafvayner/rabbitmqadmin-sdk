@@ -55,6 +55,51 @@ async fn whoami_accepts_3x_tags_as_comma_separated_string() {
 }
 
 #[tokio::test]
+async fn custom_http_client_still_sends_auth_header() {
+    let srv = common::server().await;
+    // The mock REQUIRES the basic-auth header. A caller-supplied reqwest
+    // client has no default headers, so the SDK must inject auth per-request.
+    Mock::given(method("GET"))
+        .and(path("/api/whoami"))
+        .and(common::guest_auth())
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "name": "guest",
+            "tags": ["administrator"]
+        })))
+        .expect(1)
+        .mount(&srv)
+        .await;
+
+    let custom = reqwest::Client::builder().build().unwrap();
+    let c = Client::builder(srv.uri(), "guest", "guest")
+        .http_client(custom)
+        .build()
+        .unwrap();
+    let who = c.whoami().await.unwrap();
+    assert_eq!(who.name, "guest");
+}
+
+#[tokio::test]
+async fn custom_http_client_sends_auth_on_mutating_verbs_too() {
+    let srv = common::server().await;
+    // Auth injection must also apply to PUT (not just GET).
+    Mock::given(method("PUT"))
+        .and(path("/api/vhosts/prod"))
+        .and(common::guest_auth())
+        .respond_with(ResponseTemplate::new(204))
+        .expect(1)
+        .mount(&srv)
+        .await;
+
+    let custom = reqwest::Client::builder().build().unwrap();
+    let c = Client::builder(srv.uri(), "guest", "guest")
+        .http_client(custom)
+        .build()
+        .unwrap();
+    c.create_vhost("prod").await.unwrap();
+}
+
+#[tokio::test]
 async fn not_found_maps_to_error_not_found() {
     let srv = common::server().await;
     Mock::given(method("GET"))
