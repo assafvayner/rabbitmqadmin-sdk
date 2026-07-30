@@ -143,7 +143,21 @@ impl Client {
 
     /// Low-level `DELETE`; the response body is ignored.
     pub(crate) async fn delete(&self, path: &str) -> Result<()> {
-        let resp = self.http.delete(self.url(path)?).send().await?;
+        self.delete_with_headers(path, &[]).await
+    }
+
+    /// Low-level `DELETE` with extra request headers (e.g. `X-Reason`);
+    /// the response body is ignored.
+    pub(crate) async fn delete_with_headers(
+        &self,
+        path: &str,
+        headers: &[(&str, &str)],
+    ) -> Result<()> {
+        let mut req = self.http.delete(self.url(path)?);
+        for (k, v) in headers {
+            req = req.header(*k, *v);
+        }
+        let resp = req.send().await?;
         handle_response(resp).await?;
         Ok(())
     }
