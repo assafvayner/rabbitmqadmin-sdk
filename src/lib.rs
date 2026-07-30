@@ -116,9 +116,6 @@ impl Client {
     }
 
     /// Low-level `PUT` with a JSON body; the response body is ignored.
-    // Used by resource modules (queues, exchanges, ...) landing in later
-    // milestones; not yet called from within the crate.
-    #[allow(dead_code)]
     pub(crate) async fn put<B: Serialize>(&self, path: &str, body: &B) -> Result<()> {
         let resp = self.http.put(self.url(path)?).json(body).send().await?;
         handle_response(resp).await?;
@@ -126,7 +123,6 @@ impl Client {
     }
 
     /// Low-level `POST` with a JSON body; the response body is ignored.
-    #[allow(dead_code)]
     pub(crate) async fn post<B: Serialize>(&self, path: &str, body: &B) -> Result<()> {
         let resp = self.http.post(self.url(path)?).json(body).send().await?;
         handle_response(resp).await?;
@@ -135,7 +131,6 @@ impl Client {
 
     /// Low-level `POST` with a JSON body, returning a deserialized JSON
     /// response body.
-    #[allow(dead_code)]
     pub(crate) async fn post_json<B, T>(&self, path: &str, body: &B) -> Result<T>
     where
         B: Serialize,
@@ -147,7 +142,6 @@ impl Client {
     }
 
     /// Low-level `DELETE`; the response body is ignored.
-    #[allow(dead_code)]
     pub(crate) async fn delete(&self, path: &str) -> Result<()> {
         let resp = self.http.delete(self.url(path)?).send().await?;
         handle_response(resp).await?;
@@ -156,9 +150,6 @@ impl Client {
 
     /// Like [`Client::delete`], but prefixes [`Error::NotFound`] messages
     /// with `ctx` so callers can tell which resource was missing.
-    // Used by resource modules (queues, exchanges, ...) landing in later
-    // milestones; not yet called from within the crate.
-    #[allow(dead_code)]
     pub(crate) async fn delete_ctx(&self, path: &str, ctx: &str) -> Result<()> {
         self.delete(path).await.map_err(|e| api::nf(e, ctx))
     }

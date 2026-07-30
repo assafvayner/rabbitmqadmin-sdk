@@ -4,6 +4,7 @@ pub mod cluster_name;
 pub mod common;
 pub mod node;
 pub mod overview;
+pub mod queue;
 
 use serde::Deserialize;
 

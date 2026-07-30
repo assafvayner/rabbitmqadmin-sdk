@@ -2,6 +2,7 @@
 
 mod nodes;
 mod overview;
+mod queues;
 
 use crate::{Error, Result};
 
@@ -13,8 +14,6 @@ use crate::{Error, Result};
 /// This uses `application/x-www-form-urlencoded` byte serialization and then
 /// rewrites `+` (form encoding for space) to `%20`, which is the correct
 /// encoding inside a path segment.
-// Used by resource modules landing in later milestones.
-#[allow(dead_code)]
 pub(crate) fn encode_segment(s: &str) -> String {
     url::form_urlencoded::byte_serialize(s.as_bytes())
         .collect::<String>()
