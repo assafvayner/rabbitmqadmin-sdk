@@ -8,14 +8,17 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn whoami_deserializes_json_and_sends_auth() {
+async fn whoami_deserializes_4x_json_and_sends_auth() {
     let srv = common::server().await;
+    // Real RabbitMQ 4.3.4 GET /api/whoami payload: tags is a JSON array
+    // and an is_internal_user flag is present.
     Mock::given(method("GET"))
         .and(path("/api/whoami"))
         .and(common::guest_auth())
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "name": "guest",
-            "tags": "administrator"
+            "tags": ["administrator"],
+            "is_internal_user": true
         })))
         .expect(1)
         .mount(&srv)
@@ -24,7 +27,31 @@ async fn whoami_deserializes_json_and_sends_auth() {
     let c = Client::new(&srv.uri(), "guest", "guest").unwrap();
     let who = c.whoami().await.unwrap();
     assert_eq!(who.name, "guest");
-    assert_eq!(who.tags, "administrator");
+    assert_eq!(who.tags, vec!["administrator"]);
+    assert_eq!(who.is_internal_user, Some(true));
+}
+
+#[tokio::test]
+async fn whoami_accepts_3x_tags_as_comma_separated_string() {
+    let srv = common::server().await;
+    // RabbitMQ 3.12 shape: tags is a comma-separated string and
+    // is_internal_user is absent.
+    Mock::given(method("GET"))
+        .and(path("/api/whoami"))
+        .and(common::guest_auth())
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "name": "guest",
+            "tags": "administrator, management"
+        })))
+        .expect(1)
+        .mount(&srv)
+        .await;
+
+    let c = Client::new(&srv.uri(), "guest", "guest").unwrap();
+    let who = c.whoami().await.unwrap();
+    assert_eq!(who.name, "guest");
+    assert_eq!(who.tags, vec!["administrator", "management"]);
+    assert_eq!(who.is_internal_user, None);
 }
 
 #[tokio::test]
@@ -112,7 +139,7 @@ async fn malformed_json_maps_to_error_deserialize() {
         // WhoAmI.name must be a string; a number fails deserialization.
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "name": 42,
-            "tags": "administrator"
+            "tags": ["administrator"]
         })))
         .mount(&srv)
         .await;
@@ -141,7 +168,8 @@ async fn base_url_normalization_avoids_double_api() {
             .and(common::guest_auth())
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "name": "guest",
-                "tags": "administrator"
+                "tags": ["administrator"],
+                "is_internal_user": true
             })))
             .expect(1)
             .mount(&srv)

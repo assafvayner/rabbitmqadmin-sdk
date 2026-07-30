@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Identity and cluster name.
     let me = client.whoami().await?;
-    println!("logged in as {} (tags: {})", me.name, me.tags);
+    println!("logged in as {} (tags: {})", me.name, me.tags.join(","));
     println!("cluster: {}", client.cluster_name().await?);
 
     // Cluster-wide overview.

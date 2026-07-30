@@ -14,7 +14,7 @@
 //! # async fn example() -> rabbitmqadmin_sdk::Result<()> {
 //! let client = Client::new("http://localhost:15672", "guest", "guest")?;
 //! let me = client.whoami().await?;
-//! println!("logged in as {} (tags: {})", me.name, me.tags);
+//! println!("logged in as {} (tags: {})", me.name, me.tags.join(","));
 //! # Ok(())
 //! # }
 //! ```

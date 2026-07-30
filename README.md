@@ -27,7 +27,7 @@ use rabbitmqadmin_sdk::Client;
 # async fn example() -> rabbitmqadmin_sdk::Result<()> {
 let client = Client::new("http://localhost:15672", "guest", "guest")?;
 let me = client.whoami().await?;
-println!("logged in as {} (tags: {})", me.name, me.tags);
+println!("logged in as {} (tags: {})", me.name, me.tags.join(","));
 
 for q in client.list_queues().await? {
     println!("{}/{}: {} messages", q.vhost, q.name, q.messages.unwrap_or(0));

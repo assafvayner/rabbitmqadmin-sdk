@@ -19,12 +19,21 @@ pub mod vhost;
 
 use serde::Deserialize;
 
+use crate::types::common::deserialize_tags;
+
 /// Response of `GET /api/whoami`: the identity the server sees for the
 /// credentials used by this client.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WhoAmI {
     /// Username of the authenticated user.
     pub name: String,
-    /// Comma-separated list of user tags (e.g. `"administrator"`).
-    pub tags: String,
+    /// User tags (e.g. `["administrator"]`). RabbitMQ 4.x returns a JSON
+    /// array; RabbitMQ 3.12 returns a comma-separated string — both are
+    /// normalized to a `Vec<String>`.
+    #[serde(default, deserialize_with = "deserialize_tags")]
+    pub tags: Vec<String>,
+    /// Whether the authenticated user is an internal user (RabbitMQ 4.x
+    /// only; `None` on 3.12).
+    #[serde(default)]
+    pub is_internal_user: Option<bool>,
 }

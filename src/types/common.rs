@@ -1,7 +1,35 @@
 //! Types shared across multiple Management API responses.
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use serde_json::Value;
+
+/// Deserialize a `tags` field that RabbitMQ represents differently across
+/// versions: RabbitMQ 3.12 returns a comma-separated string (e.g.
+/// `"administrator,management"`) while RabbitMQ 4.x returns a JSON array
+/// (e.g. `["administrator", "management"]`). Both shapes are normalized
+/// to a `Vec<String>`; string values are split on `,` with whitespace
+/// trimmed and empty segments dropped.
+pub(crate) fn deserialize_tags<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Tags {
+        S(String),
+        V(Vec<String>),
+    }
+
+    match Tags::deserialize(deserializer)? {
+        Tags::S(s) => Ok(s
+            .split(',')
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+            .map(str::to_owned)
+            .collect()),
+        Tags::V(v) => Ok(v),
+    }
+}
 
 /// Message rate counters as returned inside overview, queue, channel, and
 /// connection payloads under the `message_stats` key.
