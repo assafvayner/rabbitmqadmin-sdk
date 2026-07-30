@@ -1,5 +1,6 @@
 //! Internal API helpers and per-resource `impl Client` blocks.
 
+mod bindings;
 mod exchanges;
 mod nodes;
 mod overview;

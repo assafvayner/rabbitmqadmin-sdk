@@ -1,5 +1,6 @@
 //! Response and request payload types for the RabbitMQ Management API.
 
+pub mod binding;
 pub mod cluster_name;
 pub mod common;
 pub mod exchange;

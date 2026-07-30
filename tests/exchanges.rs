@@ -262,5 +262,10 @@ async fn list_exchange_bindings_source_returns_array() {
         .unwrap();
 
     assert_eq!(bindings.len(), 1);
-    assert_eq!(bindings[0]["source"], "amq.direct");
+    assert_eq!(bindings[0].source, "amq.direct");
+    assert_eq!(bindings[0].vhost, "/");
+    assert_eq!(bindings[0].destination, "q1");
+    assert_eq!(bindings[0].destination_type, "queue");
+    assert_eq!(bindings[0].routing_key, "q1");
+    assert_eq!(bindings[0].properties_key.as_deref(), Some("q1"));
 }

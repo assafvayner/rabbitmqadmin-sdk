@@ -68,14 +68,11 @@ impl Client {
 
     /// `GET /api/exchanges/{vhost}/{name}/bindings/source` — lists the
     /// bindings for which this exchange is the source.
-    ///
-    /// Currently returned as raw [`serde_json::Value`]s; this will become
-    /// `Vec<Binding>` once the bindings module lands (Task 8 will migrate it).
     pub async fn list_exchange_bindings_source(
         &self,
         vhost: &str,
         name: &str,
-    ) -> Result<Vec<serde_json::Value>> {
+    ) -> Result<Vec<crate::types::binding::Binding>> {
         self.get(
             &format!("{}/bindings/source", exchange_path(vhost, name)),
             None,
