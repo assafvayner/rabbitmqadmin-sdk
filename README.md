@@ -21,6 +21,12 @@ and day-2 operations for RabbitMQ 3.12+ / 4.x brokers with the management plugin
 
 Add the dependency and point a `Client` at your broker:
 
+```toml
+[dependencies]
+rabbitmqadmin-sdk = "0.0.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+```
+
 ```rust,no_run
 use rabbitmqadmin_sdk::Client;
 
