@@ -154,7 +154,7 @@ async fn get_node_encodes_name_in_path() {
 async fn get_node_not_found_maps_to_error_not_found() {
     let srv = common::server().await;
     Mock::given(method("GET"))
-        .and(path("/api/nodes/rabbit%40ghost"))
+        .and(path("/api/nodes/missing"))
         .and(common::guest_auth())
         .respond_with(ResponseTemplate::new(404).set_body_string("Object Not Found"))
         .expect(1)
@@ -162,9 +162,15 @@ async fn get_node_not_found_maps_to_error_not_found() {
         .await;
 
     let c = Client::new(&srv.uri(), "guest", "guest").unwrap();
-    let err = c.get_node("rabbit@ghost").await.unwrap_err();
+    let err = c.get_node("missing").await.unwrap_err();
     match err {
-        Error::NotFound(body) => assert!(body.contains("Not Found")),
+        Error::NotFound(msg) => {
+            assert!(
+                msg.contains("node 'missing'"),
+                "expected context in message, got: {msg}"
+            );
+            assert!(msg.contains("Not Found"), "body preserved: {msg}");
+        }
         other => panic!("expected Error::NotFound, got {other:?}"),
     }
 }

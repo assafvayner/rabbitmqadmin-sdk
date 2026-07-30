@@ -5,7 +5,7 @@
 //! `pagination=true`) and then respond with a [`Paginated`] envelope instead
 //! of a bare JSON array.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// Query parameters for paginated list endpoints.
 ///
@@ -13,20 +13,19 @@ use serde::{Deserialize, Serialize};
 /// string. When a `PaginationQuery` is supplied to a list method, the
 /// `pagination=true` parameter is always added so the server responds with a
 /// [`Paginated`] envelope.
-#[derive(Debug, Default, Clone, Serialize)]
+///
+/// Serialization to the query string is hand-rolled in [`Self::to_pairs`]
+/// (the single source of truth), so no `Serialize` derive is needed.
+#[derive(Debug, Default, Clone)]
 pub struct PaginationQuery {
     /// 1-based page number to fetch.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub page: Option<u32>,
     /// Number of items per page.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
     /// Filter by name (literal string, or regular expression when
     /// `use_regex` is true).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// Interpret `name` as a regular expression.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub use_regex: Option<bool>,
 }
 

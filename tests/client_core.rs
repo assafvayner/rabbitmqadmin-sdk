@@ -40,7 +40,13 @@ async fn not_found_maps_to_error_not_found() {
     let c = Client::new(&srv.uri(), "guest", "guest").unwrap();
     let err = c.whoami().await.unwrap_err();
     match err {
-        Error::NotFound(body) => assert!(body.contains("Not Found")),
+        Error::NotFound(msg) => {
+            assert!(
+                msg.contains("whoami"),
+                "expected 'whoami' context in message, got: {msg}"
+            );
+            assert!(msg.contains("Not Found"), "body preserved: {msg}");
+        }
         other => panic!("expected Error::NotFound, got {other:?}"),
     }
 }
@@ -62,6 +68,66 @@ async fn unauthorized_maps_to_error_api() {
             assert_eq!(reason, "not authorised");
         }
         other => panic!("expected Error::Api, got {other:?}"),
+    }
+}
+
+#[test]
+fn base_url_without_scheme_is_rejected() {
+    match Client::new("localhost:15672", "guest", "guest") {
+        Err(Error::InvalidUrl(msg)) => {
+            assert!(
+                msg.contains("localhost:15672"),
+                "message mentions the offending input: {msg}"
+            );
+            assert!(
+                msg.contains("scheme"),
+                "message mentions the scheme problem: {msg}"
+            );
+        }
+        Err(other) => panic!("expected Error::InvalidUrl, got {other}"),
+        Ok(_) => panic!("expected Error::InvalidUrl, but the client built successfully"),
+    }
+}
+
+#[test]
+fn base_url_with_non_http_scheme_is_rejected() {
+    match Client::new("ftp://localhost:15672", "guest", "guest") {
+        Err(Error::InvalidUrl(msg)) => {
+            assert!(
+                msg.contains("scheme"),
+                "message mentions the scheme problem: {msg}"
+            );
+        }
+        Err(other) => panic!("expected Error::InvalidUrl, got {other}"),
+        Ok(_) => panic!("expected Error::InvalidUrl, but the client built successfully"),
+    }
+}
+
+#[tokio::test]
+async fn malformed_json_maps_to_error_deserialize() {
+    let srv = common::server().await;
+    Mock::given(method("GET"))
+        .and(path("/api/whoami"))
+        .and(common::guest_auth())
+        // WhoAmI.name must be a string; a number fails deserialization.
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "name": 42,
+            "tags": "administrator"
+        })))
+        .mount(&srv)
+        .await;
+
+    let c = Client::new(&srv.uri(), "guest", "guest").unwrap();
+    let err = c.whoami().await.unwrap_err();
+    match err {
+        Error::Deserialize { source, body } => {
+            assert!(!source.to_string().is_empty());
+            assert!(
+                body.contains("\"name\":42"),
+                "body kept for debugging: {body}"
+            );
+        }
+        other => panic!("expected Error::Deserialize, got {other:?}"),
     }
 }
 

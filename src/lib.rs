@@ -84,7 +84,7 @@ impl Client {
     /// `GET /api/whoami` — returns the identity the server associates with
     /// this client's credentials.
     pub async fn whoami(&self) -> Result<types::WhoAmI> {
-        self.get("whoami", None).await
+        self.get_ctx("whoami", None, "whoami").await
     }
 
     /// Low-level `GET` returning a deserialized JSON body.
@@ -100,10 +100,19 @@ impl Client {
             .query(&query.map(|q| q.to_pairs()).unwrap_or_default());
         let resp = req.send().await?;
         let body = handle_response(resp).await?;
-        serde_json::from_str(&body).map_err(|e| Error::Api {
-            status: 0,
-            reason: format!("failed to deserialize response: {e}; body: {body}"),
-        })
+        serde_json::from_str(&body).map_err(|e| Error::Deserialize { source: e, body })
+    }
+
+    /// Like [`Client::get`], but prefixes [`Error::NotFound`] messages with
+    /// `ctx` (e.g. `"node 'rabbit@host'"` or `"overview"`) so callers can
+    /// tell which resource was missing.
+    pub(crate) async fn get_ctx<T: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: Option<&PaginationQuery>,
+        ctx: &str,
+    ) -> Result<T> {
+        self.get(path, query).await.map_err(|e| api::nf(e, ctx))
     }
 
     /// Low-level `PUT` with a JSON body; the response body is ignored.
@@ -134,10 +143,7 @@ impl Client {
     {
         let resp = self.http.post(self.url(path)?).json(body).send().await?;
         let body = handle_response(resp).await?;
-        serde_json::from_str(&body).map_err(|e| Error::Api {
-            status: 0,
-            reason: format!("failed to deserialize response: {e}; body: {body}"),
-        })
+        serde_json::from_str(&body).map_err(|e| Error::Deserialize { source: e, body })
     }
 
     /// Low-level `DELETE`; the response body is ignored.
@@ -148,8 +154,26 @@ impl Client {
         Ok(())
     }
 
+    /// Like [`Client::delete`], but prefixes [`Error::NotFound`] messages
+    /// with `ctx` so callers can tell which resource was missing.
+    // Used by resource modules (queues, exchanges, ...) landing in later
+    // milestones; not yet called from within the crate.
+    #[allow(dead_code)]
+    pub(crate) async fn delete_ctx(&self, path: &str, ctx: &str) -> Result<()> {
+        self.delete(path).await.map_err(|e| api::nf(e, ctx))
+    }
+
     /// Join a relative API path onto the base URL.
+    ///
+    /// Paths must be relative to the base URL (which always ends in
+    /// `/api/`) and therefore must NOT start with `/` — a leading slash
+    /// would make `Url::join` discard the `/api/` prefix and produce a
+    /// URL outside the API. Debug builds assert on this footgun.
     fn url(&self, path: &str) -> Result<reqwest::Url> {
+        debug_assert!(
+            !path.starts_with('/'),
+            "API paths must be relative (no leading '/'): {path}"
+        );
         self.base_url
             .join(path)
             .map_err(|e| Error::InvalidUrl(format!("{path}: {e}")))
@@ -168,6 +192,11 @@ impl ClientBuilder {
     /// Normalize the base URL, build the HTTP client with default headers
     /// (HTTP Basic auth and `Content-Type: application/json`), and return
     /// the [`Client`].
+    ///
+    /// The base URL must use the `http` or `https` scheme; anything else
+    /// (including a missing scheme, which the URL parser would interpret
+    /// as a scheme itself, e.g. `localhost:15672`) is rejected with
+    /// [`Error::InvalidUrl`].
     pub fn build(self) -> Result<Client> {
         let trimmed = self.base_url.trim_end_matches('/');
         let with_api = if trimmed.ends_with("/api") {
@@ -177,6 +206,18 @@ impl ClientBuilder {
         };
         let base_url = reqwest::Url::parse(&with_api)
             .map_err(|e| Error::InvalidUrl(format!("{}: {e}", self.base_url)))?;
+        if base_url.scheme() != "http" && base_url.scheme() != "https" {
+            return Err(Error::InvalidUrl(format!(
+                "invalid base URL '{}': scheme must be http or https",
+                self.base_url
+            )));
+        }
+        if base_url.cannot_be_a_base() {
+            return Err(Error::InvalidUrl(format!(
+                "invalid base URL '{}': cannot be used as a base URL",
+                self.base_url
+            )));
+        }
 
         let mut headers = HeaderMap::new();
         let auth = format!("{}:{}", self.username, self.password);
@@ -224,4 +265,24 @@ fn base64_encode(data: &[u8]) -> String {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn url_joins_relative_path_onto_api_base() {
+        let c = Client::new("http://localhost:15672", "guest", "guest").unwrap();
+        let u = c.url("nodes").unwrap();
+        assert_eq!(u.as_str(), "http://localhost:15672/api/nodes");
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "API paths must be relative")]
+    fn url_panics_on_leading_slash_in_debug_builds() {
+        let c = Client::new("http://localhost:15672", "guest", "guest").unwrap();
+        let _ = c.url("/nodes");
+    }
 }

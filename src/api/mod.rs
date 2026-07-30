@@ -42,6 +42,15 @@ pub(crate) async fn handle_response(resp: reqwest::Response) -> Result<String> {
     }
 }
 
+/// Prefix an [`Error::NotFound`] message with a human-readable context
+/// (e.g. the resource being fetched), leaving all other errors untouched.
+pub(crate) fn nf(e: Error, ctx: &str) -> Error {
+    match e {
+        Error::NotFound(body) => Error::NotFound(format!("{ctx}: {body}")),
+        other => other,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
