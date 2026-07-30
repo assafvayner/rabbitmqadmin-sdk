@@ -1,11 +1,11 @@
 //! Types for the `/api/bindings` endpoints.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// A binding between an exchange (source) and a queue or exchange
 /// (destination), as returned by `GET /api/bindings` and related endpoints.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Binding {
     /// Name of the exchange the binding originates from.
     pub source: String,
