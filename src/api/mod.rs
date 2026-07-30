@@ -4,7 +4,10 @@ mod bindings;
 mod exchanges;
 mod nodes;
 mod overview;
+mod permissions;
 mod queues;
+mod users;
+mod vhosts;
 
 use crate::{Error, Result};
 

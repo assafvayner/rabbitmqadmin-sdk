@@ -6,7 +6,10 @@ pub mod common;
 pub mod exchange;
 pub mod node;
 pub mod overview;
+pub mod permission;
 pub mod queue;
+pub mod user;
+pub mod vhost;
 
 use serde::Deserialize;
 
