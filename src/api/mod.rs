@@ -1,5 +1,7 @@
-//! Internal API helpers: percent-encoding of path segments and response
-//! handling.
+//! Internal API helpers and per-resource `impl Client` blocks.
+
+mod nodes;
+mod overview;
 
 use crate::{Error, Result};
 

@@ -1,5 +1,10 @@
 //! Response and request payload types for the RabbitMQ Management API.
 
+pub mod cluster_name;
+pub mod common;
+pub mod node;
+pub mod overview;
+
 use serde::Deserialize;
 
 /// Response of `GET /api/whoami`: the identity the server sees for the
