@@ -7,5 +7,7 @@
 //! bindings, vhosts, users, policies, purging queues, and more).
 
 mod error;
+mod pagination;
 
 pub use error::{Error, Result};
+pub use pagination::{Paginated, PaginationQuery};
