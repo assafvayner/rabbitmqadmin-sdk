@@ -112,6 +112,8 @@ mod tests {
         }
         let p: Paginated<Item> = serde_json::from_value(body).unwrap();
         assert_eq!(p.items.len(), 2);
+        assert_eq!(p.items[0].name, "q1");
+        assert_eq!(p.items[1].name, "q2");
         assert_eq!(p.page, 1);
         assert_eq!(p.page_size, 100);
         assert_eq!(p.total_count, 5);
