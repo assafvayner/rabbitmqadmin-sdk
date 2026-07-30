@@ -23,7 +23,7 @@ Add the dependency and point a `Client` at your broker:
 
 ```toml
 [dependencies]
-rabbitmqadmin-sdk = "0.0.0"
+rabbitmqadmin-sdk = "0.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 
