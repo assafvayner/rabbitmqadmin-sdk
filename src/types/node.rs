@@ -12,7 +12,7 @@ pub struct Node {
     /// Node name, e.g. `"rabbit@host1"`.
     pub name: String,
     /// Node type: `"disc"` or `"ram"`.
-    #[serde(default)]
+    #[serde(rename = "type", default)]
     pub node_type: Option<String>,
     /// Whether the node is running.
     #[serde(default)]

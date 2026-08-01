@@ -118,9 +118,36 @@ async fn list_nodes_returns_all_nodes() {
     assert_eq!(nodes.len(), 2);
     assert_eq!(nodes[0].name, "rabbit@host1");
     assert_eq!(nodes[1].name, "rabbit@host2");
+    // The wire key is literally "type" — serde must rename it to `node_type`.
+    assert_eq!(nodes[0].node_type.as_deref(), Some("disc"));
+    assert_eq!(nodes[1].node_type.as_deref(), Some("disc"));
     assert_eq!(nodes[0].mem_used, Some(71_000_000));
     assert_eq!(nodes[0].fd_total, Some(1_048_576));
     assert_eq!(nodes[1].mem_used, None);
+}
+
+/// Regression test for the `Node.node_type` deserialization bug: the
+/// Management API returns this value under the JSON key `"type"`, not
+/// `"node_type"`. Without `#[serde(rename = "type")]` this field silently
+/// stayed `None` against every real broker.
+#[tokio::test]
+async fn get_node_populates_node_type_from_real_world_type_key() {
+    let srv = common::server().await;
+    Mock::given(method("GET"))
+        .and(path("/api/nodes/rabbit%40host1"))
+        .and(common::guest_auth())
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "name": "rabbit@host1",
+            "type": "disc",
+            "running": true
+        })))
+        .expect(1)
+        .mount(&srv)
+        .await;
+
+    let c = Client::new(&srv.uri(), "guest", "guest").unwrap();
+    let node = c.get_node("rabbit@host1").await.unwrap();
+    assert_eq!(node.node_type.as_deref(), Some("disc"));
 }
 
 #[tokio::test]
@@ -146,6 +173,7 @@ async fn get_node_encodes_name_in_path() {
     let c = Client::new(&srv.uri(), "guest", "guest").unwrap();
     let node = c.get_node("rabbit@host").await.unwrap();
     assert_eq!(node.name, "rabbit@host");
+    assert_eq!(node.node_type.as_deref(), Some("disc"));
     assert_eq!(node.running, Some(true));
     assert_eq!(node.uptime, Some(86_400_000));
 }
